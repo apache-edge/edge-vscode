@@ -130,6 +130,26 @@ export class WendyCLI {
     }
     await this.exec(args);
   }
+
+  /**
+   * Renames a device, updating its hostname/mDNS name on the device and its
+   * asset name in Wendy Cloud. Optionally overrides the cloud gRPC endpoint.
+   *
+   * @param deviceAddress Address (hostname or hostname:port) of the device to rename.
+   * @param name New device name (a DNS label, e.g. `wendyos-living-room`).
+   * @param cloudGRPC Optional cloud gRPC endpoint override.
+   */
+  public async renameDevice(
+    deviceAddress: string,
+    name: string,
+    cloudGRPC?: string
+  ): Promise<void> {
+    const args = ["device", "rename", name, "--device", deviceAddress];
+    if (cloudGRPC && cloudGRPC.trim() !== "") {
+      args.push("--cloud-grpc", cloudGRPC.trim());
+    }
+    await this.exec(args);
+  }
 }
 
 export interface WendyInfo {

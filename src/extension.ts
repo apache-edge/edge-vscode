@@ -472,6 +472,89 @@ export async function activate(
       ),
 
       vscode.commands.registerCommand(
+        "wendyDevices.renameDevice",
+        async (item: DeviceTreeItem | undefined) => {
+          const targetItem = getTargetDeviceTreeItem(item);
+          if (!targetItem?.device) {
+            vscode.window.showErrorMessage(
+              "No device selected. Select a device in the Devices panel first."
+            );
+            return;
+          }
+
+          const device = targetItem.device;
+
+          // Mirrors the CLI's DNS-label validation:
+          // ^[a-z][a-z0-9-]{0,62}$ with no trailing hyphen.
+          const validateDeviceName = (value: string): string | undefined => {
+            if (!value) {
+              return "Name cannot be empty.";
+            }
+            if (value.length > 63) {
+              return "Name must be at most 63 characters.";
+            }
+            if (!/^[a-z][a-z0-9-]{0,62}$/.test(value)) {
+              return "Name must start with a lowercase letter and contain only lowercase letters, digits, and hyphens.";
+            }
+            if (value.endsWith("-")) {
+              return "Name cannot end with a hyphen.";
+            }
+            return undefined;
+          };
+
+          const name = await vscode.window.showInputBox({
+            title: "Rename Device",
+            prompt:
+              "New device name — sets the hostname and mDNS name on the device, and the asset name in Wendy Cloud.",
+            value: "wendyos-",
+            valueSelection: [8, 8],
+            placeHolder: "wendyos-living-room",
+            validateInput: (value) => validateDeviceName(value.trim()) ?? null,
+          });
+
+          if (!name) {
+            return;
+          }
+
+          const trimmedName = name.trim();
+          const validationError = validateDeviceName(trimmedName);
+          if (validationError) {
+            vscode.window.showErrorMessage(`Invalid device name: ${validationError}`);
+            return;
+          }
+
+          const cli = await WendyCLI.create();
+          if (!cli) {
+            vscode.window.showErrorMessage(
+              "Wendy CLI is not available. Please check your installation."
+            );
+            return;
+          }
+
+          await vscode.window.withProgress(
+            {
+              location: vscode.ProgressLocation.Notification,
+              title: `Renaming device to "${trimmedName}"…`,
+              cancellable: false,
+            },
+            async () => {
+              try {
+                await cli.renameDevice(device.address, trimmedName);
+                vscode.window.showInformationMessage(
+                  `Device renamed to "${trimmedName}" (mDNS: ${trimmedName}.local).`
+                );
+                devicesProvider.refresh();
+              } catch (error) {
+                vscode.window.showErrorMessage(
+                  `Failed to rename device: ${getErrorDescription(error)}`
+                );
+              }
+            }
+          );
+        }
+      ),
+
+      vscode.commands.registerCommand(
         "wendyDevices.connectWifi",
         async (item) => {
           if (item?.device) {
