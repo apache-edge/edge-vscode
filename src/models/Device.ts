@@ -25,6 +25,20 @@ export class Device {
   public gpuArch: string | undefined;
 
   /**
+   * Number of online logical CPU cores reported by `wendy device info`.
+   * Populated asynchronously after the device is discovered. Undefined when
+   * the agent did not report it (older agents or non-Linux hosts).
+   */
+  public cpuCount: number | undefined;
+
+  /**
+   * Total physical RAM in bytes reported by `wendy device info`.
+   * Populated asynchronously after the device is discovered. Undefined when
+   * the agent did not report it (older agents or non-Linux hosts).
+   */
+  public memTotalBytes: number | undefined;
+
+  /**
    * Routable network interfaces reported by `wendy device info`.
    * Loopback, down, and container/virtual bridge interfaces are omitted.
    * Populated asynchronously after the device is discovered. Empty or undefined

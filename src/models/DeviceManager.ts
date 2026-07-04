@@ -94,6 +94,16 @@ export interface DeviceInfo {
    * Vendor-specific format. Present only when the device has a detected GPU.
    */
   gpuArch?: string;
+  /**
+   * Number of online logical CPU cores. Present only when the agent reports it
+   * (requires a recent agent on a Linux host). Zero means unknown.
+   */
+  cpuCount?: number;
+  /**
+   * Total physical RAM in bytes. Present only when the agent reports it
+   * (requires a recent agent on a Linux host). Zero means unknown.
+   */
+  memTotalBytes?: number;
 }
 
 export interface WifiConnectionResult {
@@ -395,6 +405,16 @@ export class DeviceManager implements vscode.Disposable {
     }
     if (info.gpuArch) {
       device.gpuArch = info.gpuArch;
+      changed = true;
+    }
+    // cpuCount and memTotalBytes are omitted from JSON when zero/unknown; only
+    // set them when the agent reported a real value (> 0).
+    if (info.cpuCount && info.cpuCount > 0) {
+      device.cpuCount = info.cpuCount;
+      changed = true;
+    }
+    if (info.memTotalBytes && info.memTotalBytes > 0) {
+      device.memTotalBytes = info.memTotalBytes;
       changed = true;
     }
     if (changed) {
