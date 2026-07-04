@@ -3,6 +3,7 @@ import { Device } from "./Device";
 import { v7 as uuidv7 } from "uuid";
 import { execFile } from "child_process";
 import { WendyCLI } from "../wendy-cli/wendy-cli";
+import { analyticsDisabledEnv } from "../utilities/utilities";
 
 export interface EthernetDevice {
   displayName: string;
@@ -277,6 +278,7 @@ export class DeviceManager implements vscode.Disposable {
       execFile(
         cli.path,
         ["discover", "--json", "--type", type, "--timeout", timeout],
+        { env: analyticsDisabledEnv() },
         (error, stdout, stderr) => {
           if (stderr) {
             console.error(`Device discovery (${type}) stderr:`, stderr);
@@ -388,7 +390,7 @@ export class DeviceManager implements vscode.Disposable {
     }
 
     const output = await new Promise<string>((resolve, reject) => {
-      execFile(cli.path, ['device', 'info', '--device', device.address, '--json', '--check-updates', '--prerelease'], (error, stdout) => {
+      execFile(cli.path, ['device', 'info', '--device', device.address, '--json', '--check-updates', '--prerelease'], { env: analyticsDisabledEnv() }, (error, stdout) => {
         if (error) {
           reject(error);
         }
@@ -647,7 +649,7 @@ export class DeviceManager implements vscode.Disposable {
     }
 
     const output = await new Promise<string>((resolve, reject) => {
-      execFile(cli.path, ['--json', 'device', 'apps', 'list', '--device', deviceAddress], (error, stdout, stderr) => {
+      execFile(cli.path, ['--json', 'device', 'apps', 'list', '--device', deviceAddress], { env: analyticsDisabledEnv() }, (error, stdout, stderr) => {
         if (error) {
           reject(new Error(stderr || error.message));
           return;
@@ -812,7 +814,7 @@ export class DeviceManager implements vscode.Disposable {
     }
 
     const output = await new Promise<string>((resolve, reject) => {
-      execFile(cli.path, cliArgs, (error, stdout, stderr) => {
+      execFile(cli.path, cliArgs, { env: analyticsDisabledEnv() }, (error, stdout, stderr) => {
         if (error) {
           reject(new Error(stderr || error.message));
           return;

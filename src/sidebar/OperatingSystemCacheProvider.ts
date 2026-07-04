@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { WendyCLI } from "../wendy-cli/wendy-cli";
-import { execFile } from "../utilities/utilities";
+import { analyticsDisabledEnv, execFile } from "../utilities/utilities";
 
 export interface OsCacheEntry {
   name: string;
@@ -47,12 +47,11 @@ export class OperatingSystemCacheProvider
     }
 
     try {
-      const { stdout } = await execFile(cli.path, [
-        "--json",
-        "os",
-        "cache",
-        "list",
-      ]);
+      const { stdout } = await execFile(
+        cli.path,
+        ["--json", "os", "cache", "list"],
+        { env: analyticsDisabledEnv() }
+      );
       const parsed: OsCacheEntry[] = JSON.parse(stdout.trim());
       return Array.isArray(parsed) ? parsed : [];
     } catch (error) {
