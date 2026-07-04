@@ -95,6 +95,41 @@ export async function activate(
       vscode.window.setStatusBarMessage(`Copied ${label}`, 2000);
     };
 
+    const runProjectOptimize = async (fix: boolean): Promise<void> => {
+      const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+      if (!workspaceFolder) {
+        vscode.window.showErrorMessage("No workspace folder open");
+        return;
+      }
+
+      try {
+        const output = await vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: fix
+              ? "Optimizing Wendy project (applying fixes)…"
+              : "Analyzing Wendy project for optimizations…",
+            cancellable: false,
+          },
+          async () => projectManager.optimizeProject(workspaceFolder.uri.fsPath, { fix })
+        );
+
+        outputChannel.show(true);
+        if (output.trim()) {
+          outputChannel.appendLine(output);
+        }
+        vscode.window.showInformationMessage(
+          fix
+            ? "Project optimization complete. See the WendyOS output for applied fixes."
+            : "Project optimization analysis complete. See the WendyOS output for findings."
+        );
+      } catch (error) {
+        vscode.window.showErrorMessage(
+          `Failed to optimize project: ${getErrorDescription(error)}`
+        );
+      }
+    };
+
     const createDeviceInfoHtml = (
       deviceItem: DeviceTreeItem,
       deviceDetails: LANDevice | undefined
@@ -955,6 +990,16 @@ export async function activate(
             `Failed to build project: ${getErrorDescription(error)}`
           );
         }
+      }),
+
+      // Analyze the project for missed build optimizations.
+      vscode.commands.registerCommand("wendy.optimizeProject", async () => {
+        await runProjectOptimize(false);
+      }),
+
+      // Analyze and apply safe, deterministic fixes.
+      vscode.commands.registerCommand("wendy.optimizeProjectFix", async () => {
+        await runProjectOptimize(true);
       }),
 
       // Manage entitlements command
