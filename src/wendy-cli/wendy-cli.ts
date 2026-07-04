@@ -1,4 +1,5 @@
 import {
+  analyticsDisabledEnv,
   execFile,
   expandFilePathTilde,
   getErrorDescription,
@@ -83,22 +84,31 @@ export class WendyCLI {
     }
   }
 
-  private async exec(args: string[]): Promise<string> {
-    const { stdout } = await execFile(this.path, args);
+  /**
+   * @param background When true, the invocation is the extension's own
+   * (a probe or automatic refresh) rather than a user action, so usage
+   * analytics are disabled via {@link analyticsDisabledEnv}.
+   */
+  private async exec(args: string[], background = false): Promise<string> {
+    const { stdout } = await execFile(
+      this.path,
+      args,
+      background ? { env: analyticsDisabledEnv() } : {}
+    );
     return stdout.trimEnd();
   }
 
   public async getVersion(): Promise<string> {
-    return await this.exec(["--version"]);
+    return await this.exec(["--version"], true);
   }
 
   public async getInfo(): Promise<WendyInfo> {
-    const output = await this.exec(["info"]);
+    const output = await this.exec(["info"], true);
     return JSON.parse(output);
   }
 
   public async getJsonSchema(): Promise<string> {
-    return await this.exec(["json", "schema"]);
+    return await this.exec(["json", "schema"], true);
   }
 
   /**

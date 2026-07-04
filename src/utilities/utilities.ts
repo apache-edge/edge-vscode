@@ -64,6 +64,19 @@ export async function execFile(
 
 
 /**
+ * Environment for CLI invocations the extension makes on its own behalf
+ * (polling, refreshes, probes) rather than in response to an explicit user
+ * action. The wendy CLI honors WENDY_ANALYTICS=false to skip usage analytics,
+ * so background invocations don't drown out real usage.
+ *
+ * `process.env` is spread so PATH and friends survive — the CLI is resolved by
+ * path and may be a symlink/shim that relies on the inherited environment.
+ */
+export function analyticsDisabledEnv(): NodeJS.ProcessEnv {
+  return { ...process.env, WENDY_ANALYTICS: "false" };
+}
+
+/**
  * Expand ~ in file path to full $HOME folder
  * @param filepath File path
  * @returns full path

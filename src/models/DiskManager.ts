@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { Disk } from "./Disk";
 import { WendyCLI } from "../wendy-cli/wendy-cli";
 import { execFile } from "child_process";
+import { analyticsDisabledEnv } from "../utilities/utilities";
 
 export class DiskManager {
   private outputChannel: vscode.OutputChannel;
@@ -18,7 +19,7 @@ export class DiskManager {
 
     // Execute the wendy os list-drives command
     const output = await new Promise<string>((resolve, reject) => {
-      execFile(cli.path, ['os', 'list-drives', '--json', '--all'], (error, stdout) => {
+      execFile(cli.path, ['os', 'list-drives', '--json', '--all'], { env: analyticsDisabledEnv() }, (error, stdout) => {
         if (error) {
           reject(error);
         }
