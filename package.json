@@ -385,6 +385,17 @@
           "type": "string",
           "default": null,
           "description": "ID of the currently selected Wendy device"
+        },
+        "wendyos.audio.bufferMs": {
+          "type": "integer",
+          "default": 30,
+          "minimum": 0,
+          "description": "Playback jitter-buffer target latency in milliseconds for 'wendy device audio listen'. Lower values reduce latency but risk dropouts."
+        },
+        "wendyos.audio.allDevices": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include virtual/dummy capture devices (e.g. Tegra ADMAIF, HDMI) in the audio auto-selection pool when running 'wendy device audio listen'."
         }
       }
     },
