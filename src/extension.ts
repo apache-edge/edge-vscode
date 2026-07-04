@@ -850,6 +850,15 @@ export async function activate(
           args.push('--id', match[1]);
         }
 
+        const audioConfig = vscode.workspace.getConfiguration("wendyos.audio");
+        const bufferMs = audioConfig.get<number>("bufferMs", 30);
+        if (typeof bufferMs === "number" && bufferMs !== 30) {
+          args.push('--buffer-ms', String(bufferMs));
+        }
+        if (audioConfig.get<boolean>("allDevices", false)) {
+          args.push('--all');
+        }
+
         const label = item.hardware.description || item.hardware.devicePath || 'Audio';
         const terminal = vscode.window.createTerminal({
           name: `Audio: ${label}`,
