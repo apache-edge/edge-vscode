@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import * as path from "path";
 import { execFile } from "child_process";
 import { WendyCLI } from "../wendy-cli/wendy-cli";
 
@@ -37,7 +38,13 @@ export class ProjectManager {
   constructor(private outputChannel: vscode.OutputChannel) {}
 
   /**
-   * Initialize a new Wendy project
+   * Initialize a new Wendy project.
+   *
+   * Since CLI PR #1326 (WDY-1805), `wendy init` run non-interactively (no
+   * TTY, as is always the case from the extension) requires an explicit app
+   * ID via `--app-id`. The app ID is derived from the basename of
+   * `projectPath`, which matches the value the CLI previously inferred from
+   * the working directory.
    */
   async initProject(projectPath: string, language: 'swift' | 'python'): Promise<void> {
     const cli = await WendyCLI.create();
@@ -45,8 +52,14 @@ export class ProjectManager {
       throw new Error("Wendy CLI not found");
     }
 
+    // Derive the app ID from the project directory basename. This mirrors the
+    // inference the CLI used to perform silently; now we must pass it
+    // explicitly because the CLI errors when run non-interactively without an
+    // explicit app ID (WDY-1805 / CLI PR #1326).
+    const appID = path.basename(projectPath).trim();
+
     return new Promise((resolve, reject) => {
-      const args = ['init', '--path', projectPath, '--language', language];
+      const args = ['init', '--app-id', appID, '--path', projectPath, '--language', language];
       this.outputChannel.appendLine(`Executing: ${cli.path} ${args.join(' ')}`);
 
       execFile(cli.path, args, (error, stdout, stderr) => {
