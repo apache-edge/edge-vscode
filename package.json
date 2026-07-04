@@ -80,6 +80,16 @@
         "category": "Wendy"
       },
       {
+        "command": "wendy.optimizeProject",
+        "title": "Optimize Project",
+        "category": "Wendy"
+      },
+      {
+        "command": "wendy.optimizeProjectFix",
+        "title": "Optimize Project (Apply Fixes)",
+        "category": "Wendy"
+      },
+      {
         "command": "wendy.analyticsStatus",
         "title": "Analytics Status",
         "category": "Wendy"

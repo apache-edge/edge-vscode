@@ -19,6 +19,19 @@ export interface EntitlementOptions {
   path?: string;
 }
 
+export type OptimizeSeverity = "info" | "warning" | "error";
+
+export interface OptimizeProjectOptions {
+  /** Apply safe, deterministic fixes (cache mount, .dockerignore, release flag). */
+  fix?: boolean;
+  /** Force JSON output regardless of TTY state. */
+  json?: boolean;
+  /** Minimum severity that triggers a non-zero exit code. Defaults to "warning". */
+  severity?: OptimizeSeverity;
+  /** Target architecture override. Defaults to arm64 in the CLI. */
+  arch?: string;
+}
+
 export interface BuildProjectOptions {
   /** Specific Dockerfile to build from (e.g. "Dockerfile.prod"). When omitted,
    *  the CLI will auto-detect or show an interactive picker. */
@@ -137,6 +150,64 @@ export class ProjectManager {
         }
         this.outputChannel.appendLine(stdout);
         resolve();
+      });
+    });
+  }
+
+  /**
+   * Statically analyze a project's build configuration for missed
+   * optimizations via `wendy project optimize`, returning the command's raw
+   * stdout (JSON or human-readable text depending on `options.json`).
+   *
+   * The CLI exits 0 (no findings), 1 (findings at or above the severity
+   * threshold), or 2 (error). Exit code 1 is not a failure from the
+   * extension's perspective — the findings are surfaced to the user — so it
+   * resolves with the stdout rather than rejecting.
+   */
+  async optimizeProject(
+    projectPath: string,
+    options: OptimizeProjectOptions = {}
+  ): Promise<string> {
+    const cli = await WendyCLI.create();
+    if (!cli) {
+      throw new Error("Wendy CLI not found");
+    }
+
+    const args: string[] = ['project', 'optimize'];
+    if (options.json) {
+      args.push('--json');
+    }
+    if (options.fix) {
+      args.push('--fix');
+    }
+    if (options.severity) {
+      args.push('--severity', options.severity);
+    }
+    if (options.arch) {
+      args.push('--arch', options.arch);
+    }
+
+    this.outputChannel.appendLine(`Executing: ${cli.path} ${args.join(' ')}`);
+
+    return new Promise((resolve, reject) => {
+      execFile(cli.path, args, { cwd: projectPath }, (error, stdout, stderr) => {
+        if (error) {
+          // execFile sets error.code to the process exit code for non-zero
+          // exits. Exit code 1 means findings were reported above the
+          // threshold — surface the output instead of treating it as an error.
+          const code = (error as NodeJS.ErrnoException & { code?: number }).code;
+          if (code === 1 && stdout) {
+            this.outputChannel.appendLine(stdout);
+            resolve(stdout);
+            return;
+          }
+          const msg = stderr || error.message;
+          this.outputChannel.appendLine(`Error: ${msg}`);
+          reject(new Error(msg));
+          return;
+        }
+        this.outputChannel.appendLine(stdout);
+        resolve(stdout);
       });
     });
   }
