@@ -165,6 +165,12 @@
         "category": "Wendy"
       },
       {
+        "command": "wendyDevices.renameDevice",
+        "title": "Rename Device",
+        "icon": "$(edit)",
+        "category": "Wendy"
+      },
+      {
         "command": "wendyApps.showLogs",
         "title": "Show Logs",
         "category": "Wendy"
@@ -311,6 +317,11 @@
           "command": "wendyDevices.deviceSetup",
           "when": "view == wendyDevices && viewItem =~ /device/ && viewItem =~ /LAN/",
           "group": "device@1"
+        },
+        {
+          "command": "wendyDevices.renameDevice",
+          "when": "view == wendyDevices && viewItem =~ /device/ && viewItem =~ /LAN/",
+          "group": "inline"
         },
         {
           "command": "wendyDevices.unenrollDevice",
