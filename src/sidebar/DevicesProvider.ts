@@ -1,143 +1,226 @@
 import * as vscode from "vscode";
 import { Device } from "../models/Device";
-import { DeviceManager, DeviceApp } from "../models/DeviceManager";
+import { AppInfo, AppRunningState, ServiceEntry } from "../models/DeviceManager";
 
-function formatDeviceType(raw: string): string {
-  const s = raw.toLowerCase();
-  if (s.startsWith("raspberrypi5")) { return "Raspberry Pi 5"; }
-  if (s.startsWith("raspberrypi4")) { return "Raspberry Pi 4"; }
-  if (s.startsWith("raspberrypi3")) { return "Raspberry Pi 3"; }
-  if (s.startsWith("jetson-agx-thor")) { return "Jetson AGX Thor"; }
-  if (s.startsWith("jetson-agx-orin")) { return "Jetson AGX Orin"; }
-  if (s.startsWith("jetson-orin-nx")) { return "Jetson Orin NX"; }
-  if (s.startsWith("jetson-orin-nano")) { return "Jetson Orin Nano"; }
-  if (s.startsWith("jetson-orin")) { return "Jetson Orin"; }
-  return raw;
-}
-
+/**
+ * Tree item for a WendyOS device.
+ */
 export class DeviceTreeItem extends vscode.TreeItem {
-  constructor(
-    public readonly device: Device,
-    private readonly isCurrentDevice: boolean
-  ) {
+  constructor(public readonly device: Device) {
     super(device.name, vscode.TreeItemCollapsibleState.Collapsed);
-    this.tooltip = `Agent Version: ${device.agentVersion || 'unknown'}`;
-    this.iconPath = new vscode.ThemeIcon("vm");
-    const rawType = device.deviceType ?? device.connectionType;
-    const displayType = device.deviceType ? formatDeviceType(rawType) : rawType;
-    this.description = isCurrentDevice ? `Active (${displayType})` : `(${displayType})`;
-
-    let contextValue = "device";
-
-    if (isCurrentDevice) {
-      contextValue += "-current";
-    }
-
-    contextValue += `-${device.connectionType}`;
-
-    this.contextValue = contextValue;
-    this.id = device.id;
+    this.description = device.address;
+    this.contextValue = "device";
+    this.iconPath = new vscode.ThemeIcon("device-desktop");
+    this.tooltip = `${device.name} (${device.address})`;
   }
 }
 
+/**
+ * Tree item for an app running on a WendyOS device.
+ *
+ * Renders a distinct icon for each running state:
+ *  - RUNNING      → green circle ($(circle-filled))
+ *  - CRASH_LOOPING → warning sync icon ($(sync-ignored)) — app is not running
+ *                    but the agent is actively restarting it (WDY-1826)
+ *  - STOPPED      → grey circle ($(circle-outline))
+ */
 export class AppTreeItem extends vscode.TreeItem {
-  public readonly isRunning: boolean;
-
   constructor(
-    public readonly app: DeviceApp,
+    public readonly app: AppInfo,
     public readonly deviceAddress: string
   ) {
-    super(app.name, vscode.TreeItemCollapsibleState.None);
-    const state = app.runningState?.toLowerCase() || 'unknown';
-    const version = app.version || '';
-    this.isRunning = state === 'running';
-    this.tooltip = `${app.name}\nVersion: ${version}\nState: ${app.runningState || 'Unknown'}`;
-    this.iconPath = new vscode.ThemeIcon(this.isRunning ? "play" : "debug-stop");
-    this.description = `${version} (${state})`;
-    // Include running state in contextValue for conditional menus
-    this.contextValue = this.isRunning ? "app-running" : "app-stopped";
+    const hasServices =
+      Array.isArray(app.services) && app.services.length > 0;
+    super(
+      app.appName,
+      hasServices
+        ? vscode.TreeItemCollapsibleState.Collapsed
+        : vscode.TreeItemCollapsibleState.None
+    );
+
+    this.contextValue = "app";
+    this.tooltip = buildAppTooltip(app);
+
+    const { icon, description } = statePresentation(app.runningState, app.failureCount);
+    this.iconPath = icon;
+    this.description = description;
   }
 }
 
+/**
+ * Tree item for an individual service within a multi-service app.
+ */
+export class ServiceTreeItem extends vscode.TreeItem {
+  constructor(
+    public readonly service: ServiceEntry,
+    public readonly appName: string,
+    public readonly deviceAddress: string
+  ) {
+    super(service.name, vscode.TreeItemCollapsibleState.None);
+    this.contextValue = "service";
 
-type DevicesTreeItem = DeviceTreeItem | AppTreeItem;
-
-export class DevicesProvider
-  implements vscode.TreeDataProvider<DevicesTreeItem>
-{
-  private _onDidChangeTreeData: vscode.EventEmitter<
-    DevicesTreeItem | undefined | null | void
-  > = new vscode.EventEmitter<DevicesTreeItem | undefined | null | void>();
-  readonly onDidChangeTreeData: vscode.Event<
-    DevicesTreeItem | undefined | null | void
-  > = this._onDidChangeTreeData.event;
-
-  private appsCache: Map<string, DeviceApp[]> = new Map();
-
-  constructor(private deviceManager: DeviceManager) {
-    // Listen for device changes
-    this.deviceManager.onDevicesChanged(() => {
-      this.appsCache.clear();
-      this.refresh();
-    });
-
-    // Listen for current device changes
-    this.deviceManager.onCurrentDeviceChanged(() => {
-      this.refresh();
-    });
+    const { icon, description } = statePresentation(service.runningState, service.failureCount);
+    this.iconPath = icon;
+    this.description = description;
+    this.tooltip = buildServiceTooltip(service);
   }
+}
 
-  refresh(): void {
-    this.appsCache.clear();
+/**
+ * Returns the ThemeIcon and description string for a given AppRunningState.
+ *
+ * CRASH_LOOPING gets a dedicated warning icon so it is visually distinct from
+ * both RUNNING and STOPPED — mirroring the red ↻ in the CLI table output
+ * (CLI PR #1341).
+ */
+function statePresentation(
+  state: AppRunningState,
+  failureCount?: number
+): { icon: vscode.ThemeIcon; description: string } {
+  switch (state) {
+    case "RUNNING":
+      return {
+        icon: new vscode.ThemeIcon(
+          "circle-filled",
+          new vscode.ThemeColor("wendyos.runningAppForeground")
+        ),
+        description: "Running",
+      };
+    case "CRASH_LOOPING": {
+      const failures =
+        failureCount !== undefined && failureCount > 0
+          ? ` (${failureCount} restart${failureCount === 1 ? "" : "s"})`
+          : "";
+      return {
+        icon: new vscode.ThemeIcon(
+          "sync-ignored",
+          new vscode.ThemeColor("wendyos.crashLoopingAppForeground")
+        ),
+        description: `Crash-looping${failures}`,
+      };
+    }
+    default:
+      return {
+        icon: new vscode.ThemeIcon(
+          "circle-outline",
+          new vscode.ThemeColor("wendyos.stoppedAppForeground")
+        ),
+        description: "Stopped",
+      };
+  }
+}
+
+function buildAppTooltip(app: AppInfo): string {
+  const lines: string[] = [`${app.appName}  •  ${stateLabel(app.runningState)}`];
+  if (app.failureCount !== undefined && app.failureCount > 0) {
+    lines.push(`Failures: ${app.failureCount}`);
+  }
+  if (app.exitCode !== undefined) {
+    lines.push(`Last exit code: ${app.exitCode}`);
+  }
+  if (app.terminationReason) {
+    lines.push(`Termination reason: ${app.terminationReason}`);
+  }
+  if (app.runningState === "CRASH_LOOPING") {
+    lines.push("Use 'wendy device logs --app <name>' to view crash output.");
+  }
+  return lines.join("\n");
+}
+
+function buildServiceTooltip(service: ServiceEntry): string {
+  const lines: string[] = [`${service.name}  •  ${stateLabel(service.runningState)}`];
+  if (service.failureCount !== undefined && service.failureCount > 0) {
+    lines.push(`Failures: ${service.failureCount}`);
+  }
+  if (service.exitCode !== undefined) {
+    lines.push(`Last exit code: ${service.exitCode}`);
+  }
+  if (service.terminationReason) {
+    lines.push(`Termination reason: ${service.terminationReason}`);
+  }
+  return lines.join("\n");
+}
+
+function stateLabel(state: AppRunningState): string {
+  switch (state) {
+    case "RUNNING":
+      return "Running";
+    case "CRASH_LOOPING":
+      return "Crash-looping";
+    default:
+      return "Stopped";
+  }
+}
+
+/**
+ * Provides the Devices tree view in the WendyOS sidebar.
+ */
+export class DevicesProvider
+  implements vscode.TreeDataProvider<vscode.TreeItem>
+{
+  private _onDidChangeTreeData = new vscode.EventEmitter<
+    vscode.TreeItem | undefined | null | void
+  >();
+  readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
+
+  private devices: Device[] = [];
+  private apps: Map<string, AppInfo[]> = new Map();
+
+  setDevices(devices: Device[]): void {
+    this.devices = devices;
     this._onDidChangeTreeData.fire();
   }
 
-  autorefresh(): void {
-    this.deviceManager.startDiscovery();
+  setApps(deviceId: string, apps: AppInfo[]): void {
+    this.apps.set(deviceId, apps);
+    this._onDidChangeTreeData.fire();
   }
 
-  getTreeItem(element: DevicesTreeItem): vscode.TreeItem {
+  refresh(): void {
+    this._onDidChangeTreeData.fire();
+  }
+
+  getTreeItem(element: vscode.TreeItem): vscode.TreeItem {
     return element;
   }
 
-  async getChildren(element?: DevicesTreeItem): Promise<DevicesTreeItem[]> {
+  getChildren(
+    element?: vscode.TreeItem
+  ): vscode.ProviderResult<vscode.TreeItem[]> {
     if (!element) {
-      // Return devices at root level, sorted alphabetically by name/address
-      const devices = await this.deviceManager.getDevices();
-      const currentDeviceId = this.deviceManager.getCurrentDeviceId();
-
-      const sortedDevices = [...devices].sort((a, b) => {
-        const nameA = (a.name || a.address).toLowerCase();
-        const nameB = (b.name || b.address).toLowerCase();
-        return nameA.localeCompare(nameB);
-      });
-
-      return sortedDevices.map(
-        (device) => new DeviceTreeItem(device, device.id === currentDeviceId)
-      );
+      // Root: list devices.
+      if (this.devices.length === 0) {
+        const placeholder = new vscode.TreeItem(
+          "No devices found",
+          vscode.TreeItemCollapsibleState.None
+        );
+        placeholder.iconPath = new vscode.ThemeIcon("info");
+        return [placeholder];
+      }
+      return this.devices.map((d) => new DeviceTreeItem(d));
     }
 
     if (element instanceof DeviceTreeItem) {
-      // Return apps for this device
-      const deviceAddress = element.device.address;
-
-      // Check cache first
-      let apps = this.appsCache.get(deviceAddress);
-      if (!apps) {
-        try {
-          apps = await this.deviceManager.listApps(deviceAddress);
-          this.appsCache.set(deviceAddress, apps);
-        } catch {
-          apps = [];
-        }
+      const appsForDevice = this.apps.get(element.device.id) ?? [];
+      if (appsForDevice.length === 0) {
+        const placeholder = new vscode.TreeItem(
+          "No apps deployed",
+          vscode.TreeItemCollapsibleState.None
+        );
+        placeholder.iconPath = new vscode.ThemeIcon("info");
+        return [placeholder];
       }
-
-      // Sort apps alphabetically by name
-      const sortedApps = [...apps].sort((a, b) =>
-        a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+      return appsForDevice.map(
+        (app) => new AppTreeItem(app, element.device.address)
       );
+    }
 
-      return sortedApps.map(app => new AppTreeItem(app, deviceAddress));
+    if (element instanceof AppTreeItem) {
+      const services = element.app.services ?? [];
+      return services.map(
+        (svc) =>
+          new ServiceTreeItem(svc, element.app.appName, element.deviceAddress)
+      );
     }
 
     return [];
