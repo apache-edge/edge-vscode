@@ -95,6 +95,12 @@
         "category": "Wendy"
       },
       {
+        "command": "wendy.installApp",
+        "title": "Install App from AppStore",
+        "category": "Wendy",
+        "icon": "$(cloud-download)"
+      },
+      {
         "command": "wendyDevices.addDevice",
         "title": "Add Device",
         "icon": "$(add)"
@@ -257,6 +263,11 @@
           "group": "navigation"
         },
         {
+          "command": "wendy.installApp",
+          "when": "view == wendyDevices",
+          "group": "navigation"
+        },
+        {
           "command": "wendyDisks.refreshDisks",
           "when": "view == wendyDisks",
           "group": "navigation"
@@ -337,6 +348,11 @@
           "command": "wendyDevices.unenrollDevice",
           "when": "view == wendyDevices && viewItem =~ /device/ && viewItem =~ /LAN/",
           "group": "device@2"
+        },
+        {
+          "command": "wendy.installApp",
+          "when": "view == wendyDevices && viewItem =~ /device/ && viewItem =~ /LAN/",
+          "group": "device@3"
         },
         {
           "command": "wendyApps.showLogs",
