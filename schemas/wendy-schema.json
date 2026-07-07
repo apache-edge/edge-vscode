@@ -313,6 +313,22 @@
           "required": ["type"],
           "additionalProperties": false,
           "description": "HID input device access (barcode scanners, keyboards, etc.)."
+        },
+        {
+          "properties": {
+            "type": { "const": "admin" }
+          },
+          "required": ["type"],
+          "additionalProperties": false,
+          "description": "Full local device control over the agent's unauthenticated Unix socket. Grants the ability to start/stop/delete any app, read all telemetry, exec into any container, and trigger OS/agent updates. Deploy only to trusted, first-party devices."
+        },
+        {
+          "properties": {
+            "type": { "const": "build" }
+          },
+          "required": ["type"],
+          "additionalProperties": false,
+          "description": "On-device container image builder (BuildKit). Grants CAP_SYS_ADMIN and the namespace syscalls required for a nested runc executor — privileged-equivalent. Stacks on the admin entitlement for the claude-on-device use case. Deploy only to trusted, first-party devices."
         }
       ]
     },
