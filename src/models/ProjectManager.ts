@@ -3,7 +3,21 @@ import * as path from "path";
 import { execFile } from "child_process";
 import { WendyCLI } from "../wendy-cli/wendy-cli";
 
-export type EntitlementType = 'network' | 'video' | 'audio' | 'bluetooth' | 'gpu' | 'persist';
+export type EntitlementType =
+  | "network"
+  | "video"
+  | "audio"
+  | "bluetooth"
+  | "gpu"
+  | "persist"
+  | "camera"
+  | "usb"
+  | "i2c"
+  | "gpio"
+  | "spi"
+  | "input"
+  | "admin"
+  | "build";
 
 export interface Entitlement {
   type: EntitlementType;
