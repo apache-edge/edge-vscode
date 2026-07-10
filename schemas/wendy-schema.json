@@ -145,6 +145,11 @@
       "description": "Per-service configuration overrides. A service-level `frameworks.ros2` block takes precedence over the app-level block.",
       "additionalProperties": false,
       "properties": {
+        "context": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Build context path for this service, relative to wendy.json (e.g. \".\" for the project root). Used to locate the Dockerfile when each service has its own build directory."
+        },
         "frameworks": {
           "$ref": "#/$defs/frameworks"
         },
