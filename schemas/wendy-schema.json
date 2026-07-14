@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://wendy.sh/schemas/wendy.json",
+  "$id": "https://wendy.dev/schemas/wendy.json",
   "title": "Wendy App Configuration",
   "description": "Configuration file for Wendy edge computing applications (wendy.json).",
   "type": "object",
