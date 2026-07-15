@@ -61,7 +61,7 @@
     },
     "services": {
       "type": "object",
-      "description": "Per-service configuration. Keys are service names; values are service config objects that may include their own `frameworks` overrides.",
+      "description": "Per-service configuration. Keys are service names; values are service config objects that may include their own `frameworks` overrides, `readiness` probes, and `hooks`.",
       "additionalProperties": {
         "$ref": "#/$defs/serviceConfig"
       }
@@ -74,10 +74,12 @@
       }
     },
     "readiness": {
-      "$ref": "#/$defs/readiness"
+      "$ref": "#/$defs/readiness",
+      "description": "Readiness probe for single-service apps. For multi-service apps, a top-level `readiness` acts as an app-level fallback that fires once after all services have started; declare per-service probes under `services.<name>.readiness` instead."
     },
     "hooks": {
-      "$ref": "#/$defs/hooks"
+      "$ref": "#/$defs/hooks",
+      "description": "Lifecycle hook commands. For multi-service apps, a top-level `hooks` acts as an app-level fallback that fires once after all services have started; declare per-service hooks under `services.<name>.hooks` instead. Note: top-level `hooks.postStart.agent` is ignored for multi-service apps (no app-level container exists) — declare agent hooks under `services.<name>.hooks` instead."
     },
     "python": {
       "$ref": "#/$defs/python"
@@ -142,7 +144,7 @@
     },
     "serviceConfig": {
       "type": "object",
-      "description": "Per-service configuration overrides. A service-level `frameworks.ros2` block takes precedence over the app-level block.",
+      "description": "Per-service configuration overrides. A service-level `frameworks.ros2` block takes precedence over the app-level block. A service-level `readiness` probe gates only that service's own `postStart` hook and never delays other services' startup order. A service-level `hooks` fires only for that service's container.",
       "additionalProperties": false,
       "properties": {
         "context": {
@@ -162,6 +164,14 @@
         },
         "run": {
           "$ref": "#/$defs/run"
+        },
+        "readiness": {
+          "$ref": "#/$defs/readiness",
+          "description": "Readiness probe for this service. Gates only this service's own `postStart` hook — it never delays other services' startup order (`dependsOn` ordering is a separate mechanism). The probed port must be published or the service must use host networking."
+        },
+        "hooks": {
+          "$ref": "#/$defs/hooks",
+          "description": "Lifecycle hook commands for this service. `postStart.agent` is delivered only to this service's own container. `postStart.openURL` and `postStart.cli` run on the developer's machine after this service's readiness probe passes (or immediately after start if no readiness probe is declared)."
         }
       }
     },
@@ -339,12 +349,12 @@
     },
     "readiness": {
       "type": "object",
-      "description": "Probe configuration the CLI uses to determine when the app is ready.",
+      "description": "Probe configuration the CLI uses to determine when the app (or service) is ready. For multi-service apps, declare this per service under `services.<name>.readiness`; a top-level `readiness` becomes an app-level fallback that fires once after all services have started.",
       "additionalProperties": false,
       "properties": {
         "tcpSocket": {
           "type": "object",
-          "description": "Check readiness by dialing a TCP port.",
+          "description": "Check readiness by dialing a TCP port on the device host. The port must be published (`ports:`) or the service must use host networking.",
           "required": ["port"],
           "additionalProperties": false,
           "properties": {
@@ -366,7 +376,7 @@
     },
     "hooks": {
       "type": "object",
-      "description": "Lifecycle hook commands.",
+      "description": "Lifecycle hook commands. For multi-service apps, declare hooks per service under `services.<name>.hooks`; a top-level `hooks` becomes an app-level fallback that fires once after all services have started.",
       "additionalProperties": false,
       "properties": {
         "postStart": {
@@ -376,21 +386,21 @@
     },
     "hookCommand": {
       "type": "object",
-      "description": "Commands to run at a lifecycle stage.",
+      "description": "Commands to run at a lifecycle stage. Hook commands may reference ${WENDY_HOSTNAME} (the device host), ${WENDY_APP_ID}, and ${WENDY_SERVICE_NAME} (the declaring service's name; empty for single-container apps and app-level fallbacks). Windows-style %VAR% forms are also accepted.",
       "additionalProperties": false,
       "properties": {
         "openURL": {
           "type": "string",
           "format": "uri",
-          "description": "URL to open in the developer's default browser. Cross-platform; prefer this over a `cli` shell invocation of `open`/`xdg-open`/`start`. Supports ${WENDY_HOSTNAME} and ${WENDY_APP_ID} expansion."
+          "description": "URL to open in the developer's default browser after the app starts. Dispatched directly without a shell, so it works uniformly on macOS, Linux, and Windows. Supports ${WENDY_HOSTNAME}, ${WENDY_APP_ID}, and ${WENDY_SERVICE_NAME} expansion. Prefer this over a `cli` command that shells out to a platform-specific opener (`open`, `xdg-open`, `start`) — those only work on one OS and the CLI will warn about them."
         },
         "cli": {
           "type": "string",
-          "description": "Command to run on the developer's machine. Note: `open`/`xdg-open`/`start` are not portable across macOS/Linux/Windows — use `openURL` to open a URL instead."
+          "description": "Command run on the developer's machine (through the platform shell) after the app starts. Note: `open`/`xdg-open`/`start` are not portable across macOS/Linux/Windows — use `openURL` to open a URL instead. The CLI warns when it detects these platform-specific openers and suggests `openURL`."
         },
         "agent": {
           "type": "string",
-          "description": "Command to run on the device."
+          "description": "Command run on the device after the app starts. Executed directly (not through a shell), so pipes, redirects, and command substitution are not interpreted — put logic in a script and invoke that instead. Supports ${WENDY_APP_ID}, ${WENDY_HOSTNAME}, ${WENDY_SERVICE_NAME} (the declaring service's name; empty for single-container apps), and environment variable expansion. For multi-service apps, declare this under `services.<name>.hooks` — a top-level `hooks.postStart.agent` is ignored for multi-service apps since there is no app-level container to run it in."
         }
       }
     },
